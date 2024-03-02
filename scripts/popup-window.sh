@@ -1,15 +1,27 @@
 #!/usr/bin/env bash
 
-POPUP_SESSION_NAME="scratch"
-DIR="${1:-}"
+SESSION_NAME="${SESSION_NAME:-scratch}"
+DIR="${DIR:-}"
+SHELL_CMD="${SHELL_CMD:-}"
+OPTS=${OPTS:-}
 
-if [ "$(tmux display-message -p -F "#{session_name}")" = "$POPUP_SESSION_NAME" ];then
+if [ "$(tmux display-message -p -F "#{session_name}")" = "$SESSION_NAME" ];then
     tmux detach-client
     exit 0
 fi
 
-if [ -z "$DIR" ]; then
-    tmux popup -E -h '80%' -w '80%' "tmux attach -t $POPUP_SESSION_NAME || tmux new -s $POPUP_SESSION_NAME"
-else
-    tmux popup -E -h '80%' -w '80%' "tmux attach -t $POPUP_SESSION_NAME || tmux new -s $POPUP_SESSION_NAME"
+_OPTS=""
+
+if [ -n "$DIR" ]; then
+    _OPTS="$_OPTS -c $DIR"
 fi
+
+CMD="tmux attach -t ${SESSION_NAME} ${_OPTS} ${SHELL_CMD} || tmux new -s ${SESSION_NAME} ${_OPTS} ${SHELL_CMD}"
+
+# Debug
+# tmux display-message "$CMD"
+# tmux run "echo '$CMD' | pbcopy"
+
+# Run
+# tmux popup -E -h '80%' -w '80%' "$CMD"
+tmux popup -h '80%' -w '80%' "$CMD"
