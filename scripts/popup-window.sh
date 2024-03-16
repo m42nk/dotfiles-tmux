@@ -23,5 +23,4 @@ CMD="tmux attach -t ${SESSION_NAME} ${_OPTS} ${SHELL_CMD} || tmux new -s ${SESSI
 # tmux run "echo '$CMD' | pbcopy"
 
 # Run
-# tmux popup -E -h '80%' -w '80%' "$CMD"
-tmux popup -h '80%' -w '80%' "$CMD"
+tmux popup -E -h '80%' -w '80%' "$CMD"
