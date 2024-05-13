@@ -33,6 +33,7 @@ dirs=(
 	"$HOME/Work"
 	"$HOME/.config"
 	"$HOME/Dotfiles"
+	"$HOME/Dotfiles/packages"
 )
 
 if [[ $# -ge 1 ]]; then
