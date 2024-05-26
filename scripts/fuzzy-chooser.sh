@@ -11,9 +11,10 @@ _c_default=$(git config --get-color "" "white")
 _c_reset='\033[0m'
 _c_underline='\x1b[4m'
 
-current_session=$(tmux display -p '#{session_name}')
-current_window=$(tmux display -p '#{window_index}')
-current_pane=$(tmux display -p '#{pane_index}')
+info=$(tmux display -p '#{session_name}|#{window_index}|#{pane_index}')
+current_session=$(echo "$info" | cut -d '|' -f 1)
+current_window=$(echo "$info" | cut -d '|' -f 2)
+current_pane=$(echo "$info" | cut -d '|' -f 3)
 
 # tmux list-windows -a -F '#{session_name}|#{window_index}|#{window_name}|#{pane_current_command}' |
 tmux list-panes -a -F '#{session_name}|#{window_index}|#{window_name}|#{pane_index}|#{pane_current_command}' |

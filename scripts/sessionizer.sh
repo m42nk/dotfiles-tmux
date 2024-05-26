@@ -1,11 +1,25 @@
 #!/usr/bin/env bash
 
+dirs=(
+	"$HOME/Codes"
+	"$HOME/Work"
+	"$HOME/.config"
+	"$HOME/Dotfiles"
+	"$HOME/Dotfiles/packages"
+)
+
+staticDirs=(
+	"$HOME/.config"
+	"$HOME/Work"
+	"$HOME/Codes"
+)
+
 getDirs() {
 	fd \
 		--type=directory \
 		--type=symlink \
 		--max-depth=1 \
-		. ${dirs[@]}
+		. "${dirs[@]}"
 }
 
 fuzzyFind() {
@@ -20,6 +34,10 @@ appendCustomLine() {
 	tmux display-message -p "#{pane_start_path}" && cat
 }
 
+appendStaticDirs() {
+	printf "%s\n" "${staticDirs[@]}" && cat
+}
+
 shrinkHome() {
 	sed -E "s#^$HOME#~#"
 }
@@ -28,21 +46,13 @@ expandHome() {
 	sed -E "s#^~#$HOME#"
 }
 
-dirs=(
-	"$HOME/Codes"
-	"$HOME/Work"
-	"$HOME/.config"
-	"$HOME/Dotfiles"
-	"$HOME/Dotfiles/packages"
-)
-
 if [[ $# -ge 1 ]]; then
 	newDir=$(echo "$1" | expandHome)
 	dirs=("$newDir")
 fi
 
 # selected=$(getDirs | appendCustomLine | shrinkHome | fuzzyFind)
-selected=$(getDirs | appendCustomLine | shrinkHome | fuzzyFind)
+selected=$(getDirs | appendStaticDirs | appendCustomLine | shrinkHome | fuzzyFind)
 
 if [[ -z $selected ]]; then
 	exit 0
