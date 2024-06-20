@@ -12,6 +12,7 @@ staticDirs=(
 	"$HOME/.config"
 	"$HOME/Work"
 	"$HOME/Codes"
+	"$HOME/.local/share/nvim/lazy/LazyVim/"
 )
 
 getDirs() {
