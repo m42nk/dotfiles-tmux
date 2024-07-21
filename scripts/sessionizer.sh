@@ -12,7 +12,8 @@ staticDirs=(
 	"$HOME/.config"
 	"$HOME/Work"
 	"$HOME/Codes"
-	"$HOME/.local/share/nvim/lazy/LazyVim/"
+	"$HOME/GoVault"
+	"$HOME/.local/share/nvim/lazy/LazyVim"
 )
 
 getDirs() {
@@ -32,7 +33,7 @@ fuzzyFind() {
 }
 
 appendCustomLine() {
-	tmux display-message -p "#{pane_start_path}" && cat
+	tmux display-message -p "#{pane_start_path}" && cat || cat
 }
 
 appendStaticDirs() {
