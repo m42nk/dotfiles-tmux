@@ -52,7 +52,7 @@ getCurrentDir() {
 		return
 	fi
 
-	if [[ -n $TMUX ]]; then
+	if isInsideTmux; then
 		tmux display-message -p "#{pane_start_path}"
 	else
 		pwd
@@ -85,25 +85,28 @@ getChildDirs() {
 	printf "\n"
 }
 
+# Get all existing tmux sessions
+# A sessions will be marked with '>>' at the start of the line
 getSessions() {
-	if [[ -z $TMUX ]]; then
+	if ! isInsideTmux; then
 		return
 	fi
 
 	tmux list-session -F '#{session_name}|#{session_path}' |
 		while read -r row; do
-			session_name=$(echo "$row" | cut -d '|' -f 1)
-			session_path=$(echo "$row" | cut -d '|' -f 2 | shrinkHome)
+			sessName=$(echo "$row" | cut -d '|' -f 1)
+			sessPath=$(echo "$row" | cut -d '|' -f 2 | shrinkHome)
 
-			_color_black=$(git config --get-color "" "black")
-			_color_reset='\033[0m'
+			colorBlack=$(git config --get-color "" "black")
+			colorReset='\033[0m'
 
+			# Format: >> <session_path> :: <session_name>
 			echo -ne ">> "
-			echo -ne "${session_path}"
-			echo -ne "${_color_black}"
+			echo -ne "${sessPath}"
+			echo -ne "${colorBlack}"
 			echo -ne " :: "
-			echo -ne "${session_name}"
-			echo -ne "${_color_reset}"
+			echo -ne "${sessName}"
+			echo -ne "${colorReset}"
 
 			echo ""
 		done |
@@ -112,6 +115,7 @@ getSessions() {
 	printf "\n"
 }
 
+# Check if an entry is a tmux session
 isSession() {
 	if [[ $1 =~ ^\>\>.* ]]; then
 		return 0
@@ -120,6 +124,7 @@ isSession() {
 	fi
 }
 
+# Split the entry string and get the 2nd section
 getSessionName() {
 	echo -n "$1" | awk -F " :: " '{print $2}'
 }
@@ -170,8 +175,7 @@ usage() {
 	exit 1
 }
 
-main() {
-	# Parse the command line arguments
+parseOpts() {
 	while [[ "$#" -gt 0 ]]; do
 		case $1 in
 		-initial-dir)
@@ -203,8 +207,23 @@ main() {
 			echo "Invalid mode: $MODE. Allowed values are: pane, window, session."
 			usage
 		fi
-
 	fi
+}
+
+switchOrAttachSession() {
+	selectedItem=${1}
+	sessionName=$(getSessionName "$selectedItem")
+
+	if isInsideTmux; then
+		tmux switch-client -t "$sessionName"
+	else
+		tmux attach-session -t "$sessionName"
+	fi
+}
+
+main() {
+	# Parse the command line arguments
+	parseOpts "$@"
 
 	# If INITIAL_DIR is passed,
 	# remove all predefined dirs and set initial dir to the selected one
@@ -222,19 +241,21 @@ main() {
 
 	# If item is a session entry, switch to them
 	if isSession "$selectedItem"; then
-		sessionName=$(getSessionName "$selectedItem")
-
-		if [[ -z $TMUX ]]; then
-			tmux attach-session -t "$sessionName"
-		else
-			tmux switch-client -t "$sessionName"
-		fi
-
+		switchOrAttachSession "$selectedItem"
 		exit 0
 	fi
 
+	# If item is a directory, get the mode (pane/window/session)
+	# for the new item
+	selectedMode=$(getMode)
+	if [[ -z $selectedItem ]]; then
+		exit 1
+	fi
+
+	targetSession=$(basename "$selectedItem" | tr . _)
+  case "$selectedMode"
+
 	# TODO:
-	#  - add comments
 	#  - determine to create pane/session/window
 	#     - pane = tmux split-window -c
 	#     - window = tmux new-window -c
@@ -244,30 +265,22 @@ main() {
 	#     - use isTmuxServerRunning and isInsideTmux
 	#     - use consistent casing in getSessions
 
-	# If item is a directory, get the mode (pane/window/session)
-	# for the new item
-	selectedMode=$(getMode)
-	if [[ -z $selectedItem ]]; then
-		exit 1
-	fi
+	# targetSessionName=$(basename "$selectedItem" | tr . _)
 
-	targetSessionName=$(basename "$selectedItem" | tr . _)
-
-	isTmuxRunning=$(pgrep tmux)
-	if [[ -z $TMUX ]] && [[ -z $isTmuxRunning ]]; then
-		tmux new-session -s "$targetSessionName" -c "$(echo "$selectedItem" | expandHome)"
-		exit 0
-	fi
-
-	if ! tmux has-session -t "$targetSessionName" 2>/dev/null; then
-		tmux new-session -ds "$targetSessionName" -c "$(echo "$selectedItem" | expandHome)"
-	fi
-
-	if [[ -z $TMUX ]]; then
-		tmux attach-session -t "$targetSessionName"
-	else
-		tmux switch-client -t "$targetSessionName"
-	fi
+	# if ! isInsideTmux && [[ -z $isTmuxRunning ]]; then
+	# 	tmux new-session -s "$targetSessionName" -c "$(echo "$selectedItem" | expandHome)"
+	# 	exit 0
+	# fi
+	#
+	# if ! tmux has-session -t "$targetSessionName" 2>/dev/null; then
+	# 	tmux new-session -ds "$targetSessionName" -c "$(echo "$selectedItem" | expandHome)"
+	# fi
+	#
+	# if [[ -z $TMUX ]]; then
+	# 	tmux attach-session -t "$targetSessionName"
+	# else
+	# 	tmux switch-client -t "$targetSessionName"
+	# fi
 }
 
 main "$@"
