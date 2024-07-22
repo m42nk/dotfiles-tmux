@@ -3,36 +3,41 @@
 ###
 # Launch a tmux session, window, or pane with a predefined starting directory
 # and picked using a fuzzy finder (fzf).
+#
+# Usage:
+# $ ./launcher.sh
+# Fuzzy find directory and session
+#
+# $ ./launcher.sh -initial-dir /some/path
+# Fuzzy find child dirs of /some/path
+#
+# $ ./launcher.sh -mode <pane|window|session>
+# Fuzzy find directory and session and start either pane, window, or session starting from selected entry
+#
+# -mode and -initial-dir can be combined
 ###
 
 INITIAL_DIR=""
 MODE=""
 
 # These directories will be listed as is
-literalDirs=(
+LITERAL_DIRS=(
+	"$HOME/Work"
+	"$HOME/Codes"
 	"$HOME/.config"
 	"$HOME/.local/share/nvim/lazy/LazyVim"
-	"$HOME/Codes"
-	"$HOME/Dotfiles"
 	"$HOME/GoVault"
-	"$HOME/Work"
 )
 
 # Direct child (one level deep) of this directories will be listed
-childDirs=(
+CHILD_DIRS=(
 	"$HOME/.config"
 	"$HOME/Codes"
 	"$HOME/Dotfiles/packages"
 	"$HOME/Work"
 )
 
-isInsideTmux() {
-	[[ -n $TMUX ]] && return 0 || return 1
-}
-
-isTmuxServerRunning() {
-	[[ -n $(pgrep tmux) ]] && return 0 || return 1
-}
+### Home path utils {{{
 
 # Replaces '/home/username' to '~'
 shrinkHome() {
@@ -43,6 +48,9 @@ shrinkHome() {
 expandHome() {
 	sed -E "s#^~#$HOME#"
 }
+# }}}
+
+### Dirs utils {{{
 
 # If tmux is running, show it's pane start path
 # else, show current dir
@@ -52,7 +60,7 @@ getCurrentDir() {
 		return
 	fi
 
-	if isInsideTmux; then
+	if [[ -n $TMUX ]]; then
 		tmux display-message -p "#{pane_start_path}"
 	else
 		pwd
@@ -63,12 +71,12 @@ getCurrentDir() {
 
 getLiteralDirs() {
 	# Skip if array is empty
-	if [[ ${#literalDirs} -lt 1 ]]; then
+	if [[ ${#LITERAL_DIRS} -lt 1 ]]; then
 		return
 	fi
 
 	# Use `printf` to print the array
-	printf "%s\n" "${literalDirs[@]}"
+	printf "%s\n" "${LITERAL_DIRS[@]}"
 
 	printf "\n"
 }
@@ -80,43 +88,66 @@ getChildDirs() {
 		--type=symlink \
 		--max-depth=1 \
 		--color=never \
-		. "${childDirs[@]}"
+		. "${CHILD_DIRS[@]}"
+}
+# }}}
 
-	printf "\n"
+### Tmux utils {{{
+isTmuxRunning() {
+	[[ -n $(pgrep tmux) ]] && return 0 || return 1
 }
 
 # Get all existing tmux sessions
 # A sessions will be marked with '>>' at the start of the line
 getSessions() {
-	if ! isInsideTmux; then
+	# skip if tmux is not running
+	if ! isTmuxRunning; then
 		return
 	fi
 
+	# skip if initial dir exists
+	if [[ -n $INITIAL_DIR ]]; then
+		return
+	fi
+
+	_currSessName=$(tmux display -p '#{session_name}')
 	tmux list-session -F '#{session_name}|#{session_path}' |
 		while read -r row; do
-			sessName=$(echo "$row" | cut -d '|' -f 1)
-			sessPath=$(echo "$row" | cut -d '|' -f 2 | shrinkHome)
+			_sessName=$(echo "$row" | cut -d '|' -f 1)
+			_sessPath=$(echo "$row" | cut -d '|' -f 2 | shrinkHome)
 
-			colorBlack=$(git config --get-color "" "black")
-			colorReset='\033[0m'
+			_colorBlack=$(git config --get-color "" "black")
+			_colorBlue=$(git config --get-color "" "blue bold")
+			_colorDefault=$(git config --get-color "" "white")
+			_colorReset='\033[0m'
+
+			if [[ "$_sessName" = "$_currSessName" ]]; then
+				echo -ne "${_colorBlue}"
+			fi
 
 			# Format: >> <session_path> :: <session_name>
 			echo -ne ">> "
-			echo -ne "${sessPath}"
-			echo -ne "${colorBlack}"
-			echo -ne " :: "
-			echo -ne "${sessName}"
-			echo -ne "${colorReset}"
+			echo -ne "${_colorDefault}"
+			echo -ne "${_sessPath}"
+			echo -ne "${_colorBlack}"
+			echo -ne "::"
+			echo -ne "${_colorDefault}"
+			echo -ne "${_sessName}"
+			echo -ne "${_colorReset}"
 
 			echo ""
-		done |
-		sort
+		done
 
 	printf "\n"
 }
 
+# Split the entry string and get the 2nd section
+getSessionNameFromEntry() {
+	echo -n "$1" | awk -F "::" '{print $2}'
+}
+
 # Check if an entry is a tmux session
-isSession() {
+isSessionEntry() {
 	if [[ $1 =~ ^\>\>.* ]]; then
 		return 0
 	else
@@ -124,34 +155,69 @@ isSession() {
 	fi
 }
 
-# Split the entry string and get the 2nd section
-getSessionName() {
-	echo -n "$1" | awk -F " :: " '{print $2}'
+isSessionExists() {
+	if tmux has-session -t "$1" 2>/dev/null; then
+		return 0
+	fi
+
+	return 1
 }
 
-getEntries() {
-	(
-		getSessions
-		# getCurrentDir
-		getLiteralDirs
-		getChildDirs
-	) | shrinkHome | uniq
+sessionSwitch() {
+	_targetName=$1
+
+	tmux switch-client -t "$_targetName"
 }
+
+sessionAttach() {
+	_targetName=$1
+
+	tmux attach-session -t "$_targetName"
+}
+
+sessionCreate() {
+	_targetDir="$1"
+	_targetName="$2"
+
+	tmux new-session -s "$_targetName" -c "$_targetDir"
+}
+
+sessionCreateDetached() {
+	_targetDir="$1"
+	_targetName="$2"
+
+	tmux new-session -ds "$_targetName" -c "$_targetDir"
+}
+
+paneCreate() {
+	_targetPaneDir="$1"
+	tmux split-window -c "$_targetPaneDir"
+}
+
+windowCreate() {
+	_targeWindowDir="$1"
+	tmux new-window -c "$_targeWindowDir"
+}
+
+# }}}
+
+### Main utils {{{
 
 fuzzyFind() {
 	# Get header
-	header="Select a directory for a new tmux pane/window/session"
+	_header="Select an entry; '>>' is an existing session to switch, other is a directory"
 	if [[ -n $INITIAL_DIR ]]; then
-		header="Selecting from $INITIAL_DIR (ctrl-h to go back)"
+		_header="Selecting from $INITIAL_DIR (ctrl-h to go back)"
 	fi
 
 	# use ctrl-l to go into highlighted directory
 	# use ctrl-h to go back to parent directory
 	fzf \
 		--ansi \
-		--header="$header" \
+		--header="$_header" \
 		--bind="ctrl-l:become($0 -initial-dir {})" \
-		--bind="ctrl-h:become($0)"
+		--bind="ctrl-h:become($0)" \
+		--bind="ctrl-s:change-query(>>)"
 }
 
 getMode() {
@@ -162,13 +228,27 @@ getMode() {
 	fi
 
 	# Select mode using fzf
-	selected=$(echo -e "pane\nwindow\nsession" | fzf)
-	if [[ -z $selected ]]; then
+	_selected=$(echo -e "session\nwindow\npane" | fzf)
+	if [[ -z $_selected ]]; then
 		echo "Mode is required"
 	fi
 
-	echo "$selected"
+	echo "$_selected"
 }
+
+# Entry list builder
+getEntries() {
+	(
+		getSessions
+		# getCurrentDir
+		getLiteralDirs
+		getChildDirs
+	) | shrinkHome | uniq
+}
+
+# }}}
+
+### Shell parse utils {{{
 
 usage() {
 	echo "Usage: $0 [-initial-dir <directory>] [-mode <pane|session|window>]"
@@ -183,6 +263,13 @@ parseOpts() {
 				echo "$1 required an argument"
 				usage
 			fi
+
+			# Skip if initial dir is not a directory
+			if ! stat "$(echo "$2" | expandHome)" >/dev/null 2>&1; then
+				exec "$0"
+				exit 0
+			fi
+
 			INITIAL_DIR="$2"
 			shift 2
 			;;
@@ -210,16 +297,7 @@ parseOpts() {
 	fi
 }
 
-switchOrAttachSession() {
-	selectedItem=${1}
-	sessionName=$(getSessionName "$selectedItem")
-
-	if isInsideTmux; then
-		tmux switch-client -t "$sessionName"
-	else
-		tmux attach-session -t "$sessionName"
-	fi
-}
+# }}}
 
 main() {
 	# Parse the command line arguments
@@ -228,59 +306,95 @@ main() {
 	# If INITIAL_DIR is passed,
 	# remove all predefined dirs and set initial dir to the selected one
 	if [[ -n "$INITIAL_DIR" ]]; then
-		newDir=$(echo "$INITIAL_DIR" | expandHome)
-		childDirs=("$newDir")
-		literalDirs=()
+		_newDir=$(echo "$INITIAL_DIR" | expandHome)
+		CHILD_DIRS=("$_newDir")
+		LITERAL_DIRS=()
 	fi
 
-	# Select item
-	selectedItem=$(getEntries | fuzzyFind)
-	if [[ -z $selectedItem ]]; then
+	# Select item, item can be: session entry or directory
+	_selectedItem=$(getEntries | fuzzyFind)
+	if [[ -z $_selectedItem ]]; then
 		exit 1
 	fi
 
-	# If item is a session entry, switch to them
-	if isSession "$selectedItem"; then
-		switchOrAttachSession "$selectedItem"
+	#####
+	## If item is a session entry, switch to them
+	#####
+	if isSessionEntry "$_selectedItem"; then
+		_targetName=$(getSessionNameFromEntry "$_selectedItem")
+
+		if [[ -z $TMUX ]]; then
+			sessionAttach "$_targetName"
+			exit 0
+		fi
+
+		sessionSwitch "$_targetName"
 		exit 0
 	fi
 
-	# If item is a directory, get the mode (pane/window/session)
-	# for the new item
-	selectedMode=$(getMode)
-	if [[ -z $selectedItem ]]; then
+	# Get target session name, basically get deepest dir in path (tail)
+	_targetName=$(basename "$_selectedItem" | tr . _)
+	_targetDir="$(echo "$_selectedItem" | expandHome)"
+
+	#####
+	## If tmux is not running,
+	## create and attach to new session
+	#####
+	if ! isTmuxRunning; then
+		sessionCreate "$_targetDir" "$_targetName"
+		exit 0
+	fi
+
+	#####
+	## If tmux is running, but current shell is outside tmux
+	## attach to them
+	#####
+	if [[ -z $TMUX ]]; then
+		if isSessionExists "$_targetName"; then
+			sessionAttach "$_targetName"
+			exit 0
+		fi
+
+		sessionCreate "$_targetDir" "$_targetName"
+		exit 0
+	fi
+
+	#####
+	## If tmux is running, and current shell is inside tmux,
+	## switch to them, and choose mode
+	#####
+
+	_selectedMode=$(getMode)
+	if [[ -z $_selectedMode ]]; then
 		exit 1
 	fi
 
-	targetSession=$(basename "$selectedItem" | tr . _)
-  case "$selectedMode"
+	case "$_selectedMode" in
+	pane)
+		paneCreate "$_targetDir"
+		exit 0
+		;;
+	window)
+		windowCreate "$_targetDir"
+		exit 0
+		;;
+	session)
+		if isSessionExists "$_targetName"; then
+			sessionSwitch "$_targetName"
+			exit 0
+		fi
 
-	# TODO:
-	#  - determine to create pane/session/window
-	#     - pane = tmux split-window -c
-	#     - window = tmux new-window -c
-	#     - session = tmux switch-client -c
-	#  - refactor
-	#     - main function for better readability
-	#     - use isTmuxServerRunning and isInsideTmux
-	#     - use consistent casing in getSessions
+		sessionCreateDetached "$_targetDir" "$_targetName"
+		sessionSwitch "$_targetName"
+		;;
+	*)
+		exit 1
+		;;
 
-	# targetSessionName=$(basename "$selectedItem" | tr . _)
+	esac
 
-	# if ! isInsideTmux && [[ -z $isTmuxRunning ]]; then
-	# 	tmux new-session -s "$targetSessionName" -c "$(echo "$selectedItem" | expandHome)"
-	# 	exit 0
-	# fi
-	#
-	# if ! tmux has-session -t "$targetSessionName" 2>/dev/null; then
-	# 	tmux new-session -ds "$targetSessionName" -c "$(echo "$selectedItem" | expandHome)"
-	# fi
-	#
-	# if [[ -z $TMUX ]]; then
-	# 	tmux attach-session -t "$targetSessionName"
-	# else
-	# 	tmux switch-client -t "$targetSessionName"
-	# fi
 }
 
 main "$@"
+
+# vim: foldmethod=marker:foldlevel=0
