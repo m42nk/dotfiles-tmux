@@ -27,13 +27,14 @@ LITERAL_DIRS=(
 	"$HOME/.config"
 	"$HOME/.local/share/nvim/lazy/LazyVim"
 	"$HOME/GoVault"
+	"$HOME/Dotfiles"
 )
 
 # Direct child (one level deep) of this directories will be listed
 CHILD_DIRS=(
 	"$HOME/.config"
 	"$HOME/Codes"
-	"$HOME/Dotfiles/packages"
+	"$HOME/Dotfiles"
 	"$HOME/Work"
 )
 
