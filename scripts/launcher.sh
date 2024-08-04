@@ -27,6 +27,7 @@ LITERAL_DIRS=(
 	"$HOME/.config"
 	"$HOME/.local/share/nvim/lazy/LazyVim"
 	"$HOME/GoVault"
+	"$HOME/GoVault/_ Scratch"
 	"$HOME/Dotfiles"
 )
 
@@ -192,7 +193,7 @@ sessionCreateDetached() {
 
 paneCreate() {
 	_targetPaneDir="$1"
-	tmux split-window -c "$_targetPaneDir"
+	tmux split-window -h -c "$_targetPaneDir"
 }
 
 windowCreate() {
@@ -229,7 +230,12 @@ getMode() {
 	fi
 
 	# Select mode using fzf
-	_selected=$(echo -e "session\nwindow\npane" | fzf)
+	modeOrder=(
+		"pane"
+		"window"
+		"session"
+	)
+	_selected=$(echo -e "${modeOrder[@]}" | tr ' ' '\n' | fzf)
 	if [[ -z $_selected ]]; then
 		echo "Mode is required"
 	fi
