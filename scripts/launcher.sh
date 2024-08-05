@@ -235,7 +235,12 @@ getMode() {
 		"window"
 		"session"
 	)
-	_selected=$(echo -e "${modeOrder[@]}" | tr ' ' '\n' | fzf)
+	_selected=$(
+		echo -e "${modeOrder[@]}" |
+			tr ' ' '\n' |
+			fzf --multi --bind 'result:jump,jump:accept' --jump-labels="pws"
+	)
+
 	if [[ -z $_selected ]]; then
 		echo "Mode is required"
 	fi
