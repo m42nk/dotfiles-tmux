@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 
 ###
-# Launch a tmux session, window, or pane with a predefined starting directory
-# and picked using a fuzzy finder (fzf).
+# Launch a tmux session, window, or pane with a predefined starting directory that picked using a fzf (fuzzy finder)
+# This give you the ability to separate projects (directory/repo) as tmux session (that you can jump back and forth to)
+# but still give the ability to open them in the panes or windows of current session.
+# Demo: https://asciinema.org/a/oxcdmOdhXJom1eB2plpfvmPVL
 #
 # Usage:
 # $ ./launcher.sh
@@ -15,6 +17,17 @@
 # Fuzzy find directory and session and start either pane, window, or session starting from selected entry
 #
 # -mode and -initial-dir can be combined
+#
+# Usage in config (tmux.conf):
+# bind n display-popup -E -h '80%' -w '80%' "path/to/launcher.sh"
+#
+# Usage in scripts/shell:
+# $ alias ts='~/.config/tmux/scripts/launcher.sh -mode session'
+# $ ts
+#
+# Requirements:
+# - tmux (v 3.4)
+# - fzf (v 0.54.3)
 ###
 
 INITIAL_DIR=""
