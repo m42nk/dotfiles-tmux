@@ -40,7 +40,7 @@ LITERAL_DIRS=(
 	"$HOME/.config"
 	"$HOME/.local/share/nvim/lazy/LazyVim"
 	"$HOME/GoVault"
-	"$HOME/GoVault/_ Scratch"
+	"$HOME/GoVault/00 Scratch"
 	"$HOME/Dotfiles"
 )
 
