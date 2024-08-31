@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
-list=$(cat <<EOF
+list=$(
+  cat <<EOF
 active_window_index             Index of active window in session
 alternate_on                    1 if pane is in alternate screen
 alternate_saved_x               Saved cursor X in alternate screen
@@ -195,5 +196,5 @@ window_zoomed_flag              1 if window is zoomed
 wrap_flag                       Pane wrap flag
 EOF
 )
-
-echo "${list}" | fzf
+echo "${list}" |
+  fzf --preview 'echo -e "Variable Name: {1}" "\nValue:"; echo {1} | xargs -I _ tmux display-message -p "#{_}"'
