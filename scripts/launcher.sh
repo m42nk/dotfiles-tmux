@@ -43,6 +43,7 @@ LITERAL_DIRS=(
 	"$HOME/GoVault/00 Scratch"
 	"$HOME/Dotfiles"
 	"$HOME/Work/_projects/toolbelt"
+	"$HOME/Work/_projects/on-calls"
 )
 
 # Direct child (one level deep) of this directories will be listed
