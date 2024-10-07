@@ -207,6 +207,13 @@ sessionCreateDetached() {
   tmux new-session -ds "$_targetName" -c "$_targetDir"
 }
 
+sessionRenameChdir() {
+  _targetDir="$1"
+  _targetName="$2"
+
+  tmux rename-session "$_targetName" \; attach -c "${_targetDir}"
+}
+
 paneCreate() {
   _targetPaneDir="$1"
   tmux split-window -h -c "$_targetPaneDir"
@@ -420,6 +427,10 @@ main() {
     if isSessionExists "$_targetName"; then
       sessionSwitch "$_targetName"
       exit 0
+    fi
+
+    if $REPLACE; then
+      sessionRenameChdir "$_targetDir" "$_targetName"
     fi
 
     sessionCreateDetached "$_targetDir" "$_targetName"
