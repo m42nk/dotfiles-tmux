@@ -41,7 +41,7 @@ LITERAL_DIRS=(
   "$HOME/.config"
   "$HOME/.local/share/nvim/lazy/LazyVim"
   "$HOME/GoVault"
-  "$HOME/GoVault/00 Scratch"
+  "$HOME/GoVault/Scratch"
   "$HOME/Dotfiles"
   "$HOME/Work/_projects/toolbelt"
   "$HOME/Work/_projects/on-calls"
@@ -128,32 +128,40 @@ getSessions() {
     return
   fi
 
+  _colorBlack=$(git config --get-color "" "black")
+  _colorBlue=$(git config --get-color "" "blue bold")
+  _colorDefault=$(git config --get-color "" "white")
+  _colorReset='\033[0m'
+
   _currSessName=$(tmux display -p '#{session_name}')
   tmux list-session -F '#{session_name}|#{session_path}' |
     while read -r row; do
       _sessName=$(echo "$row" | cut -d '|' -f 1)
       _sessPath=$(echo "$row" | cut -d '|' -f 2 | shrinkHome)
 
-      _colorBlack=$(git config --get-color "" "black")
-      _colorBlue=$(git config --get-color "" "blue bold")
-      _colorDefault=$(git config --get-color "" "white")
-      _colorReset='\033[0m'
+      # if [[ "$_sessName" = "$_currSessName" ]]; then
+      #   echo -ne "${_colorBlue}"
+      # fi
+      #
+      # # Format: >> <session_path> :: <session_name>
+      # echo -ne ">> "
+      # echo -ne "${_colorDefault}"
+      # echo -ne "${_sessPath}"
+      # echo -ne "${_colorBlack}"
+      # echo -ne "::"
+      # echo -ne "${_colorDefault}"
+      # echo -ne "${_sessName}"
+      # echo -ne "${_colorReset}"
+      # echo ""
 
+      str=""
       if [[ "$_sessName" = "$_currSessName" ]]; then
-        echo -ne "${_colorBlue}"
+        str="${_colorBlue}"
       fi
 
-      # Format: >> <session_path> :: <session_name>
-      echo -ne ">> "
-      echo -ne "${_colorDefault}"
-      echo -ne "${_sessPath}"
-      echo -ne "${_colorBlack}"
-      echo -ne "::"
-      echo -ne "${_colorDefault}"
-      echo -ne "${_sessName}"
-      echo -ne "${_colorReset}"
+      str+=">> ${_colorDefault}${_sessPath}${_colorBlack}::${_colorDefault}${_sessName}${_colorReset}"
+      echo -e "$str"
 
-      echo ""
     done
 
   printf "\n"
