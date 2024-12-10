@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+# # Print all command (for debugging)
+# set -x
+
 ###
 # Launch a tmux session, window, or pane with a predefined starting directory that picked using a fzf (fuzzy finder)
 # This give you the ability to separate projects (directory/repo) as tmux session (that you can jump back and forth to)
