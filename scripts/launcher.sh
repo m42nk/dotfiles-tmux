@@ -56,6 +56,7 @@ CHILD_DIRS=(
   "$HOME/Codes"
   "$HOME/Dotfiles"
   "$HOME/Work"
+  "$HOME/Codes/dewa"
 )
 
 ### Home path utils {{{

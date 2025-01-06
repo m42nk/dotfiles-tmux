@@ -3,13 +3,6 @@
 import argparse
 import subprocess
 import os
-import tempfile
-
-"""
-- User able to see the list of directories from config
-- User able to select a directory and create new session
-- User able to select a directory and attach to existing session if exists
-"""
 
 SEARCHMODES = ["all", "session", "dir"]
 SEARCHMODE_DEFAULT = "all"
@@ -19,22 +12,12 @@ KEY_SEARCHMODE_PREV = "ctrl-p"
 
 SCRIPT_PATH = os.path.realpath(__file__)
 
-TMP_DIR = tempfile.mkdtemp()
-TMP_MODE = os.path.join(TMP_DIR, "mode")
-
-print(f"TMP_DIR: {TMP_DIR}")
-
 
 def main():
     args = args_parse()
-
-    with open(TMP_MODE, "w") as f:
-        current_mode = args.searchmode
-        f.write(current_mode)
-        f.write(get_prev_mode(current_mode))
-        f.write(get_next_mode(current_mode))
-
     fuzzy_find(args.searchmode)
+
+    # fuzzy_find()
 
 
 def args_parse():
@@ -59,16 +42,25 @@ def args_parse():
 
 
 def fuzzy_find(current_mode):
-    # + f"{KEY_SEARCHMODE_NEXT}:become({SCRIPT_PATH} --searchmode {next_mode(current_mode)})",
-    # + f"{KEY_SEARCHMODE_PREV}:become({SCRIPT_PATH} --searchmode {get_prev_mode(current_mode)})",
     prev_mode, next_mode = get_prev_mode(current_mode), get_next_mode(current_mode)
+    # subprocess.run(
+    #     [
+    #         "fzf",
+    #         "--ansi",
+    #         "--header=" + get_header(current_mode),
+    #         "--bind=" + f"{KEY_SEARCHMODE_NEXT}:change-header({get_header(next_mode)})",
+    #         "--bind=" + f"{KEY_SEARCHMODE_PREV}:change-header({get_header(prev_mode)})",
+    #     ]
+    # )
     subprocess.run(
         [
             "fzf",
             "--ansi",
             "--header=" + get_header(current_mode),
-            "--bind=" + f"{KEY_SEARCHMODE_NEXT}:change-header({get_header(next_mode)})",
-            "--bind=" + f"{KEY_SEARCHMODE_PREV}:change-header({get_header(prev_mode)})",
+            "--bind="
+            + f"{KEY_SEARCHMODE_NEXT}:become({SCRIPT_PATH} --searchmode {next_mode})",
+            "--bind="
+            + f"{KEY_SEARCHMODE_PREV}:become({SCRIPT_PATH} --searchmode {prev_mode})",
         ]
     )
 
