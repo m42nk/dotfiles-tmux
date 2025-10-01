@@ -11,30 +11,58 @@ import tempfile
 - User able to select a directory and attach to existing session if exists
 """
 
-SEARCHMODES = ["all", "session", "dir"]
-SEARCHMODE_DEFAULT = "all"
+PORT = 6266
 
-KEY_SEARCHMODE_NEXT = "ctrl-n"
-KEY_SEARCHMODE_PREV = "ctrl-p"
+MODES = ["all", "session", "dir"]
+MODE_DEFAULT = "all"
+
+KEY_MODE_NEXT = "ctrl-n"
+KEY_MODE_PREV = "ctrl-p"
 
 SCRIPT_PATH = os.path.realpath(__file__)
 
-TMP_DIR = tempfile.mkdtemp()
-TMP_MODE = os.path.join(TMP_DIR, "mode")
-
-print(f"TMP_DIR: {TMP_DIR}")
+TMP_DIR = tempfile.gettempdir()
+TMP_MODE = os.path.join(TMP_DIR, "tmux-launcher-mode")
 
 
+# TODO: this is working, cleanup and refactor
 def main():
     args = args_parse()
 
-    with open(TMP_MODE, "w") as f:
-        current_mode = args.searchmode
-        f.write(current_mode)
-        f.write(get_prev_mode(current_mode))
-        f.write(get_next_mode(current_mode))
+    if not os.path.exists(TMP_MODE):
+        f = open(TMP_MODE, "w")
+        f.write(MODE_DEFAULT)
+        f.close()
 
-    fuzzy_find(args.searchmode)
+    mode = args.mode or MODE_DEFAULT
+
+    if args.static:
+        f = open(TMP_MODE, "r")
+        mode = f.read().strip()
+        f.close()
+    else:
+        f = open(TMP_MODE, "w")
+        f.write(mode)
+        f.close()
+
+    if args.mode in ["next", "prev"]:
+        mode = get_next_mode(mode) if args.mode == "next" else get_prev_mode(mode)
+
+        f = open(TMP_MODE, "w")
+        f.write(mode)
+        f.close()
+
+    content = get_content(mode)
+    header = get_header(mode)
+
+    if args.static:
+        if args.static == "header":
+            print(header)
+        elif args.static == "content":
+            print(content)
+        return
+
+    fuzzy_find(mode, content, header)
 
 
 def args_parse():
@@ -42,48 +70,61 @@ def args_parse():
 
     parser.add_argument(
         "--static",
-        action="store_true",
-        default=False,
-        help="get result only and skip fuzzy search",
+        type=str,
+        default="",
+        choices=["header", "content"],
+        help="get static text only and skip fuzzy search",
     )
 
     parser.add_argument(
-        "--searchmode",
+        "--mode",
         type=str,
         help="search mode",
-        default=SEARCHMODE_DEFAULT,
-        choices=SEARCHMODES,
+        choices=MODES + ["next", "prev"],
     )
 
     return parser.parse_args()
 
 
-def fuzzy_find(current_mode):
-    # + f"{KEY_SEARCHMODE_NEXT}:become({SCRIPT_PATH} --searchmode {next_mode(current_mode)})",
-    # + f"{KEY_SEARCHMODE_PREV}:become({SCRIPT_PATH} --searchmode {get_prev_mode(current_mode)})",
-    prev_mode, next_mode = get_prev_mode(current_mode), get_next_mode(current_mode)
+def fuzzy_find(mode, content, header):
     subprocess.run(
         [
             "fzf",
+            f"--listen={PORT}",
             "--ansi",
-            "--header=" + get_header(current_mode),
-            "--bind=" + f"{KEY_SEARCHMODE_NEXT}:change-header({get_header(next_mode)})",
-            "--bind=" + f"{KEY_SEARCHMODE_PREV}:change-header({get_header(prev_mode)})",
-        ]
+            "--header=" + header,
+            f"--bind={KEY_MODE_NEXT}:"
+            + f"execute-silent({SCRIPT_PATH} --static header --mode next)+reload({SCRIPT_PATH} --static content)+transform-header({SCRIPT_PATH} --static header)",
+            f"--bind={KEY_MODE_PREV}:"
+            + f"execute-silent({SCRIPT_PATH} --static header --mode prev)+reload({SCRIPT_PATH} --static content)+transform-header({SCRIPT_PATH} --static header)",
+        ],
+        input=content.encode(),
+        text=False,
     )
 
 
+def get_content(mode):
+    if mode == "all":
+        return "hello from all"
+    elif mode == "session":
+        return "hello from session"
+    elif mode == "dir":
+        return "hello from dir"
+    else:
+        raise ValueError(f"Unknown mode: {mode}")
+
+
 def get_header(current_mode):
-    header = f"Press {KEY_SEARCHMODE_NEXT}/{KEY_SEARCHMODE_PREV} to switch mode: "
+    header = f"Press {KEY_MODE_NEXT}/{KEY_MODE_PREV} to switch mode: "
     return f"{header}\n{get_header_modes(current_mode)}"
 
 
 def get_next_mode(current_mode):
-    return SEARCHMODES[(SEARCHMODES.index(current_mode) + 1) % len(SEARCHMODES)]
+    return MODES[(MODES.index(current_mode) + 1) % len(MODES)]
 
 
 def get_prev_mode(current_mode):
-    return SEARCHMODES[(SEARCHMODES.index(current_mode) - 1) % len(SEARCHMODES)]
+    return MODES[(MODES.index(current_mode) - 1) % len(MODES)]
 
 
 def get_header_modes(current_mode):
@@ -91,7 +132,7 @@ def get_header_modes(current_mode):
     c_reset = subprocess.getoutput("tput sgr0")
 
     header_modes = []
-    for mode in SEARCHMODES:
+    for mode in MODES:
         if mode == current_mode:
             header_modes.append(f"[{c_bold}{mode}{c_reset}]")
         else:
