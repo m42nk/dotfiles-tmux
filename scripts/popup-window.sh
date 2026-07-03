@@ -1,34 +1,43 @@
 #!/usr/bin/env bash
 
 DIR="${DIR:-}"
-WINDOW_NAME="${WINDOW_NAME:-}"
+SESSION_KEY="${SESSION_KEY:-}"
 SHELL_CMD="${SHELL_CMD:-}"
 OPTS="${OPTS:-}"
 
 get_session_name() {
-    local base_name window_key
+    local base_name scratch_key
 
     base_name="${SESSION_NAME:-scratch}"
-    if [ -z "$WINDOW_NAME" ]; then
+    if [ -z "$SESSION_KEY" ]; then
         printf '%s\n' "$base_name"
         return
     fi
 
-    window_key="$(printf '%s' "$WINDOW_NAME" | tr -cs '[:alnum:]_.-' '-')"
-    window_key="${window_key#-}"
-    window_key="${window_key%-}"
+    scratch_key="$(printf '%s' "$SESSION_KEY" | tr -cs '[:alnum:]_.-' '-')"
+    scratch_key="${scratch_key#-}"
+    scratch_key="${scratch_key%-}"
 
-    if [ -z "$window_key" ]; then
+    if [ -z "$scratch_key" ]; then
         printf '%s\n' "$base_name"
         return
     fi
 
-    printf '%s-%s\n' "$base_name" "$window_key"
+    printf '%s-%s\n' "$base_name" "$scratch_key"
+}
+
+is_current_scratch_session() {
+    local base_name current_session
+
+    base_name="${SESSION_NAME:-scratch}"
+    current_session="$(tmux display-message -p -F "#{session_name}")"
+
+    [ "$current_session" = "$base_name" ] || [[ "$current_session" == "$base_name"-* ]]
 }
 
 SESSION_NAME="$(get_session_name)"
 
-if [ "$(tmux display-message -p -F "#{session_name}")" = "$SESSION_NAME" ];then
+if is_current_scratch_session; then
     tmux detach-client
     exit 0
 fi
